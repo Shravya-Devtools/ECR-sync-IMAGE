@@ -3,7 +3,7 @@ name: Terraform Apply, Build Docker Image, and Push to ECR
 on:
   push:
     branches:
-      - master  # or master, change if needed
+      - master
 
 jobs:
   deploy:
@@ -29,7 +29,7 @@ jobs:
           # Write terraform.tfvars for Terraform variable 'repositories'
           echo "repositories = [${joined_repos}]" > terraform/terraform.tfvars
 
-          # Export for later use if needed
+          # Export for later use
           echo "REPO_LIST=${joined_repos}" >> $GITHUB_ENV
 
       - name: Configure AWS credentials
@@ -52,7 +52,9 @@ jobs:
 
       - name: Login to AWS ECR
         run: |
-          aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin "${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.$AWS_REGION.amazonaws.com"
+          aws ecr get-login-password --region $AWS_REGION | \
+          docker login --username AWS --password-stdin \
+          "${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.$AWS_REGION.amazonaws.com"
 
       - name: Build, Tag, and Push Docker Images
         run: |
@@ -62,12 +64,18 @@ jobs:
             tag=$(echo "$line" | cut -d':' -f2)
             ecr_repo="${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.$AWS_REGION.amazonaws.com/${name}"
 
-            # Build Docker image from Dockerfile (assumes Dockerfile at root)
+            echo "Checking if ECR repository '$name' exists..."
+            aws ecr describe-repositories --repository-names "$name" --region $AWS_REGION >/dev/null 2>&1 || {
+              echo "Repository '$name' not found. Creating..."
+              aws ecr create-repository --repository-name "$name" --region $AWS_REGION
+            }
+
+            echo "Building Docker image $name:$tag..."
             docker build -t "$name:$tag" .
 
-            # Tag image for ECR
+            echo "Tagging image for ECR: $ecr_repo:$tag"
             docker tag "$name:$tag" "$ecr_repo:$tag"
 
-            # Push image to ECR
+            echo "Pushing image to ECR..."
             docker push "$ecr_repo:$tag"
           done < docker-images.txt
