@@ -3,7 +3,7 @@ name: Terraform Apply, Build Docker Image, and Push to ECR
 on:
   push:
     branches:
-      - main  # or master, change if needed
+      - master  # or master, change if needed
 
 jobs:
   deploy:
