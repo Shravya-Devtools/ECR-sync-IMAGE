@@ -1,4 +1,3 @@
 myapp:latest
 backend/api:v1
 frontend/web:2.0
-
